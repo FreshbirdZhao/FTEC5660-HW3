@@ -311,7 +311,5 @@ latest run. In a fresh clone, use the same setup and command before submitting.
 
 ### Task 2: reflection
 
-See [REFLECTION.md](REFLECTION.md) for the reflection on AI sycophancy and
-AI-associated psychosis. This submission's implementation, report and reflection
-were prepared with AI assistance. The reflection is an analytical discussion,
-not a claim about the author's personal clinical experience.
+See [REFLECTION.md](Task2.pdf) for the reflection on AI sycophancy and
+AI-associated psychosis.
