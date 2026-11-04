@@ -170,14 +170,148 @@ for each public company. Grading uses a private set of about 20 unseen
 companies with the same tools and the same answer key rules, but different
 names and wording, and scores your 3 points only.
 
-## Homework 3 solution:
-> to students: this is your report, see the homework description.
+## Homework 3 solution
 
 ### My 3 points and rules
-> for each point: why you chose it, your PASS rule in one or two sentences, and the evidence it uses. Quote Fisher where it helps.
+
+I select **4, 7 and 11**. These examine the sales organization, personnel
+relations and competitive position. They illustrate Fisher's scuttlebutt
+approach: ask outsiders and employees who have direct knowledge of the
+business. The assignment explicitly identifies interviews as the evidence
+source for these points, so financial queries and management documents are
+not needed for these decisions. Each point receives its own interview rather
+than inheriting a verdict from the company's overall reputation.
+
+**Point 4: sales organization.** Fisher asks, "Does the company have an
+above-average sales organization?" PASS requires customer evidence of
+knowledgeable, proactive, consultative sales support that distinguishes the
+company from rivals; FAIL applies to passive price-list selling, unreliable
+contacts, poor product knowledge or customers seeking advice from rivals.
+The evidence is a `customer` interview on `sales_team`, with `competitor`
+as the alternate informed role. I chose this point because customers can
+describe actual support rather than a manager's opinion of their sales team.
+
+**Point 7: labour and personnel relations.** Fisher asks, "Does the company
+have outstanding labor and personnel relations?" PASS requires an informed
+employee's account of fair treatment, constructive communication and
+sustainable working conditions; FAIL applies to persistent excessive pressure,
+unfair treatment, unsafe conditions, low morale or unresolved grievances.
+The evidence is a `current_employee` interview on `working_conditions`, with
+`former_employee` as the alternate. I chose this point because employee
+retention and the handling of concerns give concrete evidence of whether
+positive personnel policies are practiced. A general statement about a good
+workplace supported by retention is relevant here; it is not evidence of a
+sales or competitive advantage for the other points.
+
+**Point 11: competitive position.** PASS requires an informed outsider's
+account of a defensible, industry-specific advantage, such as hard-to-copy
+know-how, an installed base, service, integration, switching costs or evidence
+that customers return after trying competitors; FAIL applies to interchangeable
+products, easy imitation or a predominantly price-based contest without a
+meaningful advantage. The evidence is a `competitor` interview on
+`competitive_edge`, with `customer` as the alternate. I chose this point
+because a rival's description of barriers to winning business can reveal
+advantages that financial snapshots do not explain. Customer preference is
+supporting evidence, not a guarantee of a permanent moat.
+
+These rules translate the supplied Fisher questions into explicit decision
+criteria. They do not claim that three favourable interviews alone constitute
+a complete real-world investment recommendation.
 
 ### Design
-> a visualization of your agent design and one paragraph describing it.
+
+```mermaid
+flowchart TD
+    A[Company's four provided LangChain tools] --> B[Route selected points to informed interviewees]
+    B --> C4[Point 4: customer / sales_team]
+    B --> C7[Point 7: current_employee / working_conditions]
+    B --> C11[Point 11: competitor / competitive_edge]
+    C4 --> D[Evidence labelled by point, role and topic]
+    C7 --> D
+    C11 --> D
+    D --> E[LangChain prompt and deepseek-v4-flash JSON response]
+    E --> F[Model reviews each verdict against its rule and evidence]
+    F --> G{Validate schema, point coverage and verbatim quotes}
+    G -->|Valid| H[Three verdicts and evidence-based summary]
+    G -->|Invalid: retry once with feedback| E
+    G -->|Still invalid or API failure| I[Explicit unavailable entry for this company]
+    H --> J[Unmodified runner writes results.csv and scores]
+    I --> J
+```
+
+This is a deliberately bounded agent workflow implemented with LangChain's
+tool interface, `ChatPromptTemplate`, `ChatDeepSeek` and a runnable chain.
+The program plans and routes the interviews deterministically; the model
+interprets their meaning rather than spending calls deciding whom to ask.
+Each company normally uses three interviews. An explicit inability to comment
+triggers the alternate informed role, giving at most six interviews, below
+the limit of ten. The model receives the three rules, a JSON schema and the
+interview evidence. It is prompted to review negation, mixed evidence and
+each verdict's justification before responding; this is a review instruction
+within the same call, not a separate independent model review. Pydantic then
+checks the response, and Python verifies exact point coverage and that every
+evidence quote occurs in the corresponding interview. Validation failures and
+truncated responses receive up to two fresh assessments with feedback. The
+output budget is 8,192 tokens to reduce truncation. Four companies run concurrently; each
+has a 180-second budget, while the batch has a 1,500-second budget, leaving
+time for the runner under the assignment's 30-minute limit. Errors produce
+explicit unavailable entries, which count as wrong, rather than invented
+investment judgements. The provided tools, runner and scoring code are unchanged.
 
 ### Results
-> your point score on `public_test`, the companies where your verdicts disagree with the public answers, and why.
+
+The actual public-run score, every disagreement and the interview counts are
+recorded in [public_evaluation.md](public_evaluation.md). This file is generated
+by running the official runner; it is not a hand-written claim of accuracy.
+
+After increasing the output budget, adding truncation retries and clarifying
+the competitive-advantage rule, three consecutive public evaluations run from
+the local terminal each returned **60/60 correct verdicts** and **100.0% balanced
+point accuracy**. These three console results were recorded by the student;
+the evaluation helper preserves only the latest run's detailed report.
+
+The latest run completed on 4 November 2026 at 08:19:52 UTC (16:19:52 HKT),
+using `deepseek-v4-flash`, and processed all 20 companies in 21.9 seconds.
+Independent comparison of its `results.csv` with the public answer key confirmed
+42/42 truly passing points and 18/18 truly failing points were correctly
+classified. There were no disagreements or unavailable analyses. Every company
+used exactly three interviews, below the limit of ten. Mean balanced accuracy
+across the three reported runs was 100.0%; this is public-test evidence and
+does not establish accuracy on unseen private companies.
+
+Earlier development runs exposed truncated model responses and inconsistent
+interpretation of customer return behaviour. The final implementation retries
+truncation and explicitly accepts customers returning after trying rivals as
+evidence of competitive advantage. No company-specific rules or public answers
+are embedded in the agent. The actual grade depends on the private runs.
+
+Offline checks exercise the real LangChain tools and verify schema rejection,
+quote grounding, repair after invalid output, alternate-interview routing and
+failure isolation using simulated model responses. Those checks validate the
+workflow, not DeepSeek's semantic accuracy. Public answers are accessed only
+by the provided scorer and the separate evaluation helper, never by the agent.
+
+### Reproduce the public evaluation
+
+Use Python 3.10 or newer, create a virtual environment and install
+`requirements.txt` as described above. Set `DEEPSEEK_API_KEY` in your environment
+or a local, ignored `.env` file, then run:
+
+```bash
+python evaluate_public.py
+```
+
+This runs `python hw3.py --data-folder public_test`, produces the official
+`results.csv`, and updates `public_evaluation.md` with balanced accuracy,
+disagreements, elapsed time and interview usage. The helper exits nonzero
+if any verdict is unavailable, even though the runner successfully wrote
+the CSV. Repeat this command to check stability; each report describes the
+latest run. In a fresh clone, use the same setup and command before submitting.
+`results.csv` remains ignored; `public_evaluation.md` can be included with the report.
+
+### Task 2: reflection
+
+See [REFLECTION.md](REFLECTION.md) for the reflection on AI sycophancy and
+AI-associated psychosis. This submission's implementation, report and reflection
+were prepared with AI assistance. The reflection is an analytical discussion,
+not a claim about the author's personal clinical experience.
